@@ -1,0 +1,79 @@
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('מערכת מצב עסקי ותזרים — דליה')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0');
+}
+
+function createDaliaSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var sheets = {
+    "הגדרות": ["שם עסק", "יתרת בנק פתיחה", "קופת מזומן", "מסגרת אשראי", "תאריך עדכון"],
+    "לקוחות": ["שם לקוח", "סוג לקוח", "שם חברת ביטוח", "סכום עסקה", "סכום שהתקבל", "יתרה", "תאריך עבודה", "תאריך גביה צפוי", "אופן תשלום", "מספר תשלומים", "סטטוס", "הערות", "תאריך יצירה"],
+    "כרטיסי עבודה": ["שם לקוח", "תיאור עבודה", "סכום עבודה", "הוצאה חשבונית", "דרך ביטוח", "שם חברת ביטוח", "תאריך פתיחה", "תאריך סיום", "תאריך גביה צפוי", "סכום שהתקבל", "יתרה", "מספר תשלומים", "סטטוס", "הערות", "תאריך יצירה"],
+    "ביטוח": ["שם לקוח", "שם חברת ביטוח", "סוג תיק", "סכום תביעה", "סכום מאושר", "סכום שהתקבל", "יתרה", "תאריך פתיחת תיק", "תאריך תשלום צפוי", "סטטוס", "הערות", "תאריך יצירה"],
+    "ספקים": ["שם ספק", "סוג הוצאה", "סכום כולל", "סכום ששולם", "יתרה", "תאריך תשלום ראשון", "תאריך תשלום בפועל", "אופן תשלום", "מספר תשלומים", "סטטוס", "הערות", "תאריך יצירה"],
+    "צקים": ["כיוון", "שם", "סכום כולל", "מספר תשלומים", "סכום לתשלום בודד", "תאריך פרעון ראשון", "מספר צק", "סטטוס", "הערות", "תאריך יצירה"],
+    "כרטיסי אשראי": ["שם כרטיס", "חברת אשראי", "4 ספרות אחרונות", "יום חיוב קבוע", "מסגרת אשראי", "תאריך יצירה"],
+    "חיובי אשראי": ["cardId", "שם כרטיס", "חודש חיוב", "סכום חיוב כולל", "תיאור", "תאריך יצירה"],
+    "הוראות קבע": ["שם גורם", "סוג", "סכום", "יום ירידה או כניסה", "מספר תשלומים", "תאריך התחלה", "תאריך סיום", "סטטוס", "הערות", "תאריך יצירה"],
+    "הלוואות": ["שם גוף מממן", "סכום הלוואה מקורי", "יתרה נוכחית", "תשלום חודשי", "יום חיוב", "תאריך התחלה", "תאריך סיום", "סטטוס", "הערות", "תאריך יצירה"],
+    "משפטי": ["שם גורם", "סוג תיק", "סכום בתביעה", "סכום גביה צפוי", "הוצאות משפטיות", "תאריך פתיחת תיק", "סטטוס", "הערות", "תאריך יצירה"],
+    "עובדים": ["שם עובד", "תפקיד", "שכר ברוטו", "שכר נטו", "יום תשלום", "סטטוס", "הערות", "תאריך יצירה"],
+    "הוצאות קבועות": ["שם ספק או גורם", "סוג הוצאה", "סכום חודשי", "יום תשלום", "אופן תשלום", "סטטוס", "הערות", "תאריך יצירה"],
+    "מעמ": ["תקופת דיווח", "חודש דיווח", "סכום מעמ לתשלום", "תאריך תשלום", "סטטוס", "הערות", "תאריך יצירה"]
+  };
+
+  for (var name in sheets) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+    } else {
+      sheet.clear();
+    }
+    sheet.getRange(1, 1, 1, sheets[name].length).setValues([sheets[name]]);
+  }
+}
+
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var data = JSON.parse(e.postData.contents);
+
+    var sheetName = data.sheetName;
+    var rowData = data.rowData;
+
+    if (!sheetName || !rowData) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, message: "חסר sheetName או rowData" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var sheet = ss.getSheetByName(sheetName);
+
+    if (!sheet) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: false, message: "הלשונית לא קיימת: " + sheetName }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var newRow = [];
+
+    for (var i = 0; i < headers.length; i++) {
+      var headerName = headers[i];
+      newRow.push(rowData[headerName] !== undefined ? rowData[headerName] : "");
+    }
+
+    sheet.appendRow(newRow);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: true, message: "הנתונים נשמרו בהצלחה", sheet: sheetName }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
